@@ -1,19 +1,24 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 project(Web-agent VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Включаем директории с исходными файлами
-include_directories(include)
+find_package(CURL REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(Boost REQUIRED)
 
-# Добавляем исполняемый файл
+include_directories(src)
+
 add_executable(${PROJECT_NAME}
-    src/main.cpp
+        src/main.cpp
+        src/agent/Agent.cpp
+        src/config/Config.cpp
+        src/http/HttpClient.cpp
+        src/tasks/TaskExecutor.cpp
 )
 
-# Устанавливаем свойства для более строгой компиляции
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    CXX_STANDARD_REQUIRED YES
-    CXX_EXTENSIONS NO
+target_link_libraries(${PROJECT_NAME}
+        CURL::libcurl
+        spdlog::spdlog
 )

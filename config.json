@@ -1,0 +1,11 @@
+{
+    "UID": "Bond007",
+    "access_code": "053b16-44d4-4df5-3426-609c6e79",
+    "descr": "JamesBond",
+    "log_file": "./agent.log",
+    "poll_interval_sec": 5,
+    "result_directory": "./results",
+    "server_url": "https://xdev.arkcom.ru:9999/app/webagent1/api",
+    "task_directory": "./tasks",
+    "test": "10"
+}

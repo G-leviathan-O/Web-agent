@@ -1,8 +1,20 @@
-#include <iostream>
+#include "agent/Agent.h"
+#include "config/Config.h"
+#include "logging/Logger.h"
 
 int main()
 {
-    std::cout << "Hello, world!" << std::endl;
+    Config config("config.json");
+
+    Logger::init(config.getLogFile());
+
+    spdlog::info("Logger initialized");
+
+    Agent agent(config);
+
+    agent.run();
+
+    Logger::shutdown();
 
     return 0;
 }
