@@ -24,6 +24,6 @@ make                               # для Linux/macOS
 ```
 ## 📚 Документация
 
-- [USER_GUIDE.md](USER_GUIDE.md) — установка, настройка, решение проблем
+- [USER-GUIDE.md](USER-GUIDE.md) — установка, настройка, решение проблем
 - [ARCHITECTURE.md](ARCHITECTURE.md) — устройство проекта для разработчиков
 - [API.md](API.md) — взаимодействие с сервером
