@@ -22,25 +22,8 @@ cmake ..
 cmake --build . --config Release  # для Windows
 make                               # для Linux/macOS
 ```
-Подробная инструкция по установке - в USER_GUIDE.md.
-Минимальный конфиг
-{
-    "UID": "Bond007",
-    "descr": "JamesBond",
-    "server_url": "https://xdev.arkcom.ru:9999/app/webagent1/api",
-    "poll_interval_sec": 5,
-    "log_file": "./agent.log"
-}
-Все настройки описаны в USER_GUIDE.md.
+## 📚 Документация
 
-Запуск
-./Web-agent
-
-##Документация
-USER_GUIDE.md - установка, настройка, решение проблем
-
-ARCHITECTURE.md - устройство проекта для разработчиков
-
-ARCHITECTURE.pdf - структура
-
-API.md - взаимодействие с сервером
+- [USER_GUIDE.md](USER_GUIDE.md) — установка, настройка, решение проблем
+- [ARCHITECTURE.md](ARCHITECTURE.md) — устройство проекта для разработчиков
+- [API.md](API.md) — взаимодействие с сервером
