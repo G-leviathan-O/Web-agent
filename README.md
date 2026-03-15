@@ -26,4 +26,5 @@ make                               # для Linux/macOS
 
 - [USER-GUIDE.md](USER-GUIDE.md) — установка, настройка, решение проблем
 - [ARCHITECTURE.md](ARCHITECTURE.md) — устройство проекта для разработчиков
+- [ARCHITECTURE.pdf](ARCHITECTURE.pdf) — архитектура проекта
 - [API.md](API.md) — взаимодействие с сервером
