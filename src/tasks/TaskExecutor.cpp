@@ -9,9 +9,24 @@ TaskExecutor::TaskExecutor(const std::string& dir)
     resultDir = dir;
 }
 
+
+
 json TaskExecutor::execute(const Task& task, Agent* agent)
 {
     json result;
+
+	auto set_ok = [&](const std::string& msg) {
+		result["status"] = "OK";
+		result["message"] = msg;
+		result["code_responce"] = 0;
+	};
+
+	auto set_error = [&](const std::string& msg, int code) {
+		result["status"] = "ERROR";
+		result["message"] = msg;
+		result["code_responce"] = code;
+	};
+
     switch(task.getType())
     {
         case TaskType::TIMEOUT:
@@ -20,11 +35,10 @@ json TaskExecutor::execute(const Task& task, Agent* agent)
                 unsigned int new_interval = std::stoul(task.getOptions());
                 Config config = agent->getConfig();
                 agent->updateConfig(config.setValue("poll_interval_sec", new_interval));
-                result["status"] = "OK";
-                result["message"] = "Poll interval updated";
+
+                set_ok("Poll interval updated");
             } catch(...) {
-                result["status"] = "ERROR";
-                result["message"] = "Invalid poll interval value";
+                set_error("Invalid poll interval value", -11);
             }
             break;
         }
@@ -40,35 +54,34 @@ json TaskExecutor::execute(const Task& task, Agent* agent)
 
                 Config config = agent->getConfig();
                 agent->updateConfig(config.setValue(key, value));
-                result["status"] = "OK";
-                result["message"] = key + " updated";
+
+                set_ok(key + " updated");
             } else {
-                result["status"] = "ERROR";
-                result["message"] = "Invalid config option";
+                set_error("Invalid config option", -21);
             }
             break;
         }
-        // case TaskType::FILE:
-        // {
-        //     std::string filename = task.getOptions();
-        //     std::ifstream file(config.getResultDirectory() + "/" + filename, std::ios::binary);
-        //     if(file)
-        //     {
-        //         std::string content((std::istreambuf_iterator<char>(file)),
-        //                              std::istreambuf_iterator<char>());
-        //         result["status"] = "OK";
-        //         result["file_content"] = content; // можно закодировать в base64 для безопасности
-        //     }
-        //     else
-        //     {
-        //         result["status"] = "ERROR";
-        //         result["message"] = "File not found";
-        //     }
-        //     break;
-        // }
-        // default:
-        //     result["status"] = "ERROR";
-        //     result["message"] = "Unknown task type";
+        case TaskType::FILE:
+        {
+            std::string filename = task.getOptions();
+            Config config = agent->getConfig();
+            std::ifstream file(config.getResultDirectory() + "/" + filename, std::ios::binary);
+            if(file)
+            {
+                std::string content((std::istreambuf_iterator<char>(file)),
+                                     std::istreambuf_iterator<char>());
+
+                result["file_content"] = content;
+                set_ok("File read successfully");
+            }
+            else
+            {
+                set_error("File not found", -31);
+            }
+            break;
+        }
+        default:
+            set_error("Unknown task type", -4);
     }
     return result;
 }
