@@ -44,49 +44,84 @@ void Agent::pollTasks()
 {
     spdlog::debug("Polling tasks from server.");
 
-    json req;
+    json request = {
+        {"UID", config.getUID()},
+        {"descr", config.getDescr()},
+        {"access_code", config.getAccessCode()}
+    };
 
-    req["UID"] = config.getUID();
-    req["descr"] = config.getDescr();
-    req["access_code"] = config.getAccessCode();
+    spdlog::debug("Request payload: {}", request.dump(4));
 
-    spdlog::debug("Task request: {}", req.dump());
 
-    json response = http.post("/wa_task/", req);
+    json response = http.post("/wa_task/", request);
 
-    spdlog::debug("Task response: {}", response.dump());
+    spdlog::debug("Response payload: {}", response.dump(4));
 
-	if(response.empty()) {
-        spdlog::debug("Server returned empty response"); return;
+
+	if (response.empty()) {
+        spdlog::debug("Empty response from server");
+        return;
     }
-	if(response["code_responce"] == "0") {
-        spdlog::debug("No tasks available"); return;
+
+    const std::string code = response.value("code_responce", "");
+
+	if (code == "0") {
+        spdlog::debug("No tasks available");
+        return;
     }
-    if(response["code_responce"] == "-12") {
-        spdlog::warn("Server reported agent not registered");
+    if (code == "-12") {
+        spdlog::error("Agent not registered");
         throw std::runtime_error("Agent not registered");
     }
+
 
     Task task(response);
 	TaskExecutor executor(config.getResultDirectory());
 
     spdlog::info("Executing task...");
-    auto start_time = std::chrono::high_resolution_clock::now();
+    const auto start_time = std::chrono::high_resolution_clock::now();
 
-	json result = executor.execute(task, this);
+	json exec_result = executor.execute(task, this);
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end_time - start_time;
+    const auto end_time = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> elapsed = end_time - start_time;
 
-    result["UID"] = config.getUID();
-    result["access_code"] = config.getAccessCode();
-    result["session_id"] = task.getSessionID();
+	spdlog::info("Task executed in {:.3f} sec", elapsed.count());
+    spdlog::debug("Execution result: {}", exec_result.dump(4));
 
-	spdlog::info("Task executed in {:.3f} seconds", elapsed.count());
-    spdlog::debug("Task result: {}", result.dump(4));
 
-    json post_response = http.post("/wa_result/", result);
-	spdlog::info("Server response to result post: {}", post_response.dump(4));
+	int result_code = exec_result.value("code_responce", -1);
+
+	std::vector<std::string> files;
+    if (exec_result.contains("file_names")) {
+        const std::string base_dir = config.getResultDirectory();
+
+        for (const auto& name : exec_result["file_names"]) {
+            files.emplace_back(base_dir + "/" + name.get<std::string>());
+        }
+
+        exec_result.erase("file_names");
+    }
+
+	json result_payload = {
+        {"UID", config.getUID()},
+        {"access_code", config.getAccessCode()},
+        {"message", exec_result.value("message", "")},
+        {"files", files.size()},
+        {"session_id", task.getSessionID()}
+    };
+
+	spdlog::debug("Final result payload: {}", result_payload.dump(4));
+
+
+	json post_response = http.postMultipart(
+        "/wa_result/",
+        result_code,
+        result_payload,
+        files
+    );
+
+	spdlog::info("Server response: {}", post_response.dump(4));
 }
 
 void Agent::run()

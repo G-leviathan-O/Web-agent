@@ -65,13 +65,14 @@ json TaskExecutor::execute(const Task& task, Agent* agent)
         {
             std::string filename = task.getOptions();
             Config config = agent->getConfig();
+
             std::ifstream file(config.getResultDirectory() + "/" + filename, std::ios::binary);
+
             if(file)
             {
-                std::string content((std::istreambuf_iterator<char>(file)),
-                                     std::istreambuf_iterator<char>());
+                result["files"] = 1;
+                result["file_names"] = { filename };
 
-                result["file_content"] = content;
                 set_ok("File read successfully");
             }
             else
