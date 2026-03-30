@@ -1,36 +1,23 @@
 #pragma once
-
 #include <string>
 #include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
+enum class TaskType { TIMEOUT, CONF, FILE, UNKNOWN };
 
-enum class TaskType {
-    TIMEOUT,
-    CONF,
-    FILE,
-    TASK,
-    UNKNOWN
-};
-
-class Task
-{
-private:
+class Task {
     std::string session_id;
     std::string options;
-    std::string task_code;
     TaskType type;
 
 public:
-    Task(const json& res)
-    {
-        session_id = res["session_id"];
-        options = res["options"];
-        task_code = res["task_code"];
+    Task(const nlohmann::json& j) {
+        session_id = j.value("session_id", "");
+        options = j.value("options", "");
 
-        if(task_code == "TIMEOUT") type = TaskType::TIMEOUT;
-        else if(task_code == "CONF") type = TaskType::CONF;
-        else if(task_code == "FILE") type = TaskType::FILE;
+        std::string code = j.value("task_code", "");
+        if (code == "TIMEOUT") type = TaskType::TIMEOUT;
+        else if (code == "CONF") type = TaskType::CONF;
+        else if (code == "FILE") type = TaskType::FILE;
         else type = TaskType::UNKNOWN;
     }
 

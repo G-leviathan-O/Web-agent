@@ -1,20 +1,9 @@
 #pragma once
+#include "tasks/Task.h"
+#include "config/Config.h"
+#include <nlohmann/json.hpp>
 
-#include "Task.h"
-#include "../config/Config.h"
-#include <string>
-
-class Agent;
-
-class TaskExecutor
-{
-private:
-
-    std::string resultDir;
-
+class TaskExecutor {
 public:
-
-    TaskExecutor(const std::string& dir);
-
-    json execute(const Task& task, Agent* agent);
+    nlohmann::json execute(const Task& task, Config& config);
 };

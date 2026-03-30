@@ -1,124 +1,116 @@
-#include "HttpClient.h"
-
+#include "http/HttpClient.h"
+#include "http/CurlWrapper.h"
 #include <curl/curl.h>
-#include <spdlog/spdlog.h>
+#include <stdexcept>
+#include <logging/Logger.h>
 
 using json = nlohmann::json;
 
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp)
-{
-    ((std::string*)userp)->append((char*)contents, size * nmemb);
-    return size * nmemb;
+namespace {
+    size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+        auto* s = static_cast<std::string*>(userp);
+        s->append(static_cast<char*>(contents), size * nmemb);
+        return size * nmemb;
+    }
+
+    struct CurlSList {
+        curl_slist* list{nullptr};
+        ~CurlSList() { if (list) curl_slist_free_all(list); }
+        void append(const char* h) { list = curl_slist_append(list, h); }
+        operator curl_slist*() { return list; }
+    };
 }
 
-HttpClient::HttpClient(const std::string& url)
-{
-    base_url = url;
+HttpClient::HttpClient(std::string url) : base_url(std::move(url)) {
+    spdlog::info("HttpClient initialized with base_url={}", base_url);
 }
 
-json HttpClient::post(const std::string& endpoint, const json& data)
-{
-    CURL *curl = curl_easy_init();
+json HttpClient::post(const std::string& endpoint, const json& data) {
+    spdlog::debug("HTTP POST -> {}{}", base_url, endpoint);
+    spdlog::debug("Payload: {}", data.dump());
 
-    if(!curl)
-        throw std::runtime_error("curl init failed");
-
-    std::string url = base_url + endpoint;
-
+    CurlHandle curl;
     std::string response;
 
-    std::string json_data = data.dump();
+    const std::string url = base_url + endpoint;
+    const std::string body = data.dump();
 
-    struct curl_slist *headers = NULL;
+    CurlSList headers;
+    headers.append("Content-Type: application/json");
 
-    headers = curl_slist_append(headers, "Content-Type: application/json");
+    curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, (curl_slist*)headers);
+    curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, body.c_str());
+    curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &response);
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    // NOTE: enable verification in real prod (set CA bundle path if needed)
+    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 2L);
 
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    const CURLcode res = curl_easy_perform(curl.get());
+    if (res != CURLE_OK) {
+        spdlog::error("HTTP POST failed: {}", curl_easy_strerror(res));
+        throw std::runtime_error(curl_easy_strerror(res));
+    }
 
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data.c_str());
+    spdlog::debug("Response: {}", response);
 
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-
-    CURLcode res = curl_easy_perform(curl);
-
-    curl_easy_cleanup(curl);
-
-    if(res != CURLE_OK)
-        throw std::runtime_error("HTTP request failed");
-
-    if(response.empty())
-        return json();
-
+    if (response.empty()) return json{};
     return json::parse(response);
 }
 
-json HttpClient::postMultipart(
-    const std::string& endpoint,
-    int result_code,
-    const json& result,
-    const std::vector<std::string>& files
-)
-{
-    CURL *curl = curl_easy_init();
-    if(!curl)
-        throw std::runtime_error("curl init failed");
+json HttpClient::postMultipart(const std::string& endpoint,
+                               int result_code,
+                               const json& result,
+                               const std::vector<std::string>& files) {
+    spdlog::debug("HTTP MULTIPART POST -> {}{}", base_url, endpoint);
+    spdlog::debug("Result code: {}", result_code);
+    spdlog::debug("Result payload: {}", result.dump());
+    spdlog::debug("Files count: {}", files.size());
 
-    std::string url = base_url + endpoint;
+    CurlHandle curl;
     std::string response;
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    const std::string url = base_url + endpoint;
 
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &response);
 
-    // --- MIME ---
-    curl_mime *mime = curl_mime_init(curl);
-    curl_mimepart *part;
+    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 2L);
 
-    // result_code
-    part = curl_mime_addpart(mime);
-    curl_mime_name(part, "result_code");
-    std::string code_str = std::to_string(result_code);
-    curl_mime_data(part, code_str.c_str(), CURL_ZERO_TERMINATED);
+    curl_mime* mime = curl_mime_init(curl.get());
+    if (!mime) throw std::runtime_error("curl_mime_init failed");
 
-    // result (JSON строка)
-    part = curl_mime_addpart(mime);
-    curl_mime_name(part, "result");
-    std::string json_str = result.dump();
-    curl_mime_data(part, json_str.c_str(), CURL_ZERO_TERMINATED);
+    auto add_field = [&](const char* name, const std::string& val) {
+        curl_mimepart* part = curl_mime_addpart(mime);
+        curl_mime_name(part, name);
+        curl_mime_data(part, val.c_str(), CURL_ZERO_TERMINATED);
+    };
 
-    // файлы
-    for(size_t i = 0; i < files.size(); ++i)
-    {
-        part = curl_mime_addpart(mime);
+    add_field("result_code", std::to_string(result_code));
+    add_field("result", result.dump());
 
-        std::string field_name = "file" + std::to_string(i + 1);
-        curl_mime_name(part, field_name.c_str());
-
+    for (size_t i = 0; i < files.size(); ++i) {
+        curl_mimepart* part = curl_mime_addpart(mime);
+        std::string field = "file" + std::to_string(i + 1);
+        curl_mime_name(part, field.c_str());
         curl_mime_filedata(part, files[i].c_str());
     }
 
-    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    curl_easy_setopt(curl.get(), CURLOPT_MIMEPOST, mime);
 
-    CURLcode res = curl_easy_perform(curl);
+    const CURLcode res = curl_easy_perform(curl.get());
 
     curl_mime_free(mime);
-    curl_easy_cleanup(curl);
 
-    if(res != CURLE_OK)
-        throw std::runtime_error("HTTP multipart request failed");
+    if (res != CURLE_OK) {
+        spdlog::error("HTTP multipart failed: {}", curl_easy_strerror(res));
+        throw std::runtime_error(curl_easy_strerror(res));
+    }
 
-    if(response.empty())
-        return json();
-
+    if (response.empty()) return json{};
     return json::parse(response);
 }

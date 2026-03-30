@@ -1,88 +1,82 @@
-#include "TaskExecutor.h"
-#include "../agent/Agent.h"
-#include <boost/process.hpp>
+#include "tasks/TaskExecutor.h"
+#include "config/ConfigManager.h"
+#include <fstream>
+#include <logging/Logger.h>
 
-namespace bp = boost::process;
+using json = nlohmann::json;
 
-TaskExecutor::TaskExecutor(const std::string& dir)
-{
-    resultDir = dir;
-}
+json TaskExecutor::execute(const Task& task, Config& config) {
+    spdlog::info("Executing task...");
+    spdlog::debug("Task type: {}", static_cast<int>(task.getType()));
+    spdlog::debug("Task options: {}", task.getOptions());
 
-
-
-json TaskExecutor::execute(const Task& task, Agent* agent)
-{
     json result;
 
-	auto set_ok = [&](const std::string& msg) {
-		result["status"] = "OK";
-		result["message"] = msg;
-		result["code_responce"] = 0;
-	};
+    auto ok = [&](const std::string& msg){
+        result["status"] = "OK";
+        result["message"] = msg;
+        result["code_response"] = 0;
+    };
+    auto err = [&](const std::string& msg, int code){
+        result["status"] = "ERROR";
+        result["message"] = msg;
+        result["code_response"] = code;
+    };
 
-	auto set_error = [&](const std::string& msg, int code) {
-		result["status"] = "ERROR";
-		result["message"] = msg;
-		result["code_responce"] = code;
-	};
-
-    switch(task.getType())
-    {
-        case TaskType::TIMEOUT:
-        {
+    switch (task.getType()) {
+        case TaskType::TIMEOUT: {
             try {
-                unsigned int new_interval = std::stoul(task.getOptions());
-                Config config = agent->getConfig();
-                agent->updateConfig(config.setValue("poll_interval_sec", new_interval));
+                const std::string key = "poll_interval_sec";
+                const unsigned value = std::stoul(task.getOptions());
+                
+                spdlog::info("Updating config: {}", key);
+                ConfigManager cm;
+                cm.setValue("config.json", key, value);
+                config = cm.load("config.json");
 
-                set_ok("Poll interval updated");
-            } catch(...) {
-                set_error("Invalid poll interval value", -11);
+                spdlog::info("Config successfully updated: {}", key);
+                ok("Poll interval updated");
+            } catch (...) {
+                err("Invalid poll interval value", -11);
             }
             break;
         }
-        case TaskType::CONF:
-        {
-            // Для простоты можно изменить любое поле Config через options в формате key=value
-            std::string opt = task.getOptions();
-            auto eq_pos = opt.find('=');
-            if(eq_pos != std::string::npos)
-            {
-                std::string key = opt.substr(0, eq_pos);
-                std::string value = opt.substr(eq_pos + 1);
 
-                Config config = agent->getConfig();
-                agent->updateConfig(config.setValue(key, value));
+        case TaskType::CONF: {
+            // format: key=value
+            const std::string opt = task.getOptions();
+            const auto pos = opt.find('=');
+            if (pos == std::string::npos) {
+                err("Invalid config option", -21);
+                break;
+            }
+            const std::string key = opt.substr(0, pos);
+            const std::string value = opt.substr(pos + 1);
 
-                set_ok(key + " updated");
+            spdlog::info("Updating config: {}", key);
+            ConfigManager cm;
+            cm.setValue("config.json", key, value);
+            config = cm.load("config.json");
+
+            spdlog::info("Config successfully updated: {}", key);
+            ok("Config updated: " + key);
+            break;
+        }
+
+        case TaskType::FILE: {
+            const std::string path = config.result_directory + "/" + task.getOptions();
+            std::ifstream f(path, std::ios::binary);
+            if (f) {
+                result["file_names"] = { task.getOptions() };
+                ok("File ready");
             } else {
-                set_error("Invalid config option", -21);
+                err("File not found", -31);
             }
             break;
         }
-        case TaskType::FILE:
-        {
-            std::string filename = task.getOptions();
-            Config config = agent->getConfig();
 
-            std::ifstream file(config.getResultDirectory() + "/" + filename, std::ios::binary);
-
-            if(file)
-            {
-                result["files"] = 1;
-                result["file_names"] = { filename };
-
-                set_ok("File read successfully");
-            }
-            else
-            {
-                set_error("File not found", -31);
-            }
-            break;
-        }
         default:
-            set_error("Unknown task type", -4);
+            err("Unknown task type", -4);
     }
     return result;
 }

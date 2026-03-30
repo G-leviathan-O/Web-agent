@@ -1,20 +1,16 @@
+#include "config/ConfigManager.h"
 #include "agent/Agent.h"
-#include "config/Config.h"
 #include "logging/Logger.h"
 
-int main()
-{
-    Config config("config.json");
-
-    Logger::init(config.getLogFile());
-
-    spdlog::info("Logger initialized");
+int main() {
+    ConfigManager cm;
+    auto config = cm.load("config.json");
+    
+    Logger::init(config.log_file);
 
     Agent agent(config);
-
     agent.run();
 
     Logger::shutdown();
-
     return 0;
 }

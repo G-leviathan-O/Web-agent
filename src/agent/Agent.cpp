@@ -1,30 +1,21 @@
-#include "Agent.h"
-#include <spdlog/spdlog.h>
+#include "agent/Agent.h"
+#include "config/ConfigManager.h"
 #include <thread>
 #include <chrono>
+#include <logging/Logger.h>
 
-Agent::Agent(const Config& cfg)
-    : config(cfg),
-      http(cfg.getServerURL())
-{
-    spdlog::info("Agent created: {}", cfg.getUID());
-}
+using json = nlohmann::json;
 
-Config Agent::getConfig() const
-{
-    return config;
-}
-
-void Agent::updateConfig(Config cfg)
-{
-	config = cfg;
+Agent::Agent(Config cfg)
+    : config(cfg), http(cfg.server_url) {
+    spdlog::info("Agent created. UID={}", config.uid);
 }
 
 void Agent::registerAgent()
 {
     json req;
-    req["UID"] = config.getUID();
-    req["descr"] = config.getDescr();
+    req["UID"] = config.uid;
+    req["descr"] = config.descr;
 
     spdlog::debug("Starting agent registration. Registration request: {}", req.dump());
 
@@ -34,67 +25,59 @@ void Agent::registerAgent()
 
     if (response.contains("access_code")) {
         spdlog::info("Received new access_code from server");
-        config.setAccessCode(response["access_code"]);
+        const std::string key = "access_code";
+        const std::string value = response["access_code"];
+        
+        spdlog::info("Updating config: {}", key);
+        ConfigManager cm;
+        cm.setValue("config.json", key, value);
+        config = cm.load("config.json");
+
+        spdlog::info("Config successfully updated: {}", key);
 	}
 
     return;
 }
 
-void Agent::pollTasks()
-{
-    spdlog::debug("Polling tasks from server.");
-
-    json request = {
-        {"UID", config.getUID()},
-        {"descr", config.getDescr()},
-        {"access_code", config.getAccessCode()}
+void Agent::processCycle() {
+    spdlog::debug("Starting processing cycle");
+    
+    json req = {
+        {"UID", config.uid},
+        {"access_code", config.access_code}
     };
 
-    spdlog::debug("Request payload: {}", request.dump(4));
+    spdlog::debug("Requesting tasks from server");
+    auto resp = http.post("/wa_task/", req);
 
-
-    json response = http.post("/wa_task/", request);
-
-    spdlog::debug("Response payload: {}", response.dump(4));
-
-
-	if (response.empty()) {
-        spdlog::debug("Empty response from server");
+    if (resp.empty()) {
+        spdlog::debug("No response or empty response from server");
         return;
     }
 
-    const std::string code = response.value("code_responce", "");
-
-	if (code == "0") {
-        spdlog::debug("No tasks available");
+    if (resp.value("code_responce", "0") == "0") {
+        spdlog::debug("No task from the server");
         return;
     }
-    if (code == "-12") {
-        spdlog::error("Agent not registered");
-        throw std::runtime_error("Agent not registered");
+    
+    if (resp.value("code_responce", "0") == "-12") {
+        spdlog::debug("Agent not registered");
+        registerAgent();
+        return;
     }
 
+    spdlog::debug("Parsing task from response");
+    Task task(resp);
 
-    Task task(response);
-	TaskExecutor executor(config.getResultDirectory());
+    spdlog::debug("Executing task");
+    json exec_result = executor.execute(task, config);
+    spdlog::debug("Execution result: {}", exec_result.dump());
 
-    spdlog::info("Executing task...");
-    const auto start_time = std::chrono::high_resolution_clock::now();
-
-	json exec_result = executor.execute(task, this);
-
-    const auto end_time = std::chrono::high_resolution_clock::now();
-    const std::chrono::duration<double> elapsed = end_time - start_time;
-
-	spdlog::info("Task executed in {:.3f} sec", elapsed.count());
-    spdlog::debug("Execution result: {}", exec_result.dump(4));
-
-
-	int result_code = exec_result.value("code_responce", -1);
+	int result_code = exec_result.value("code_response", -1);
 
 	std::vector<std::string> files;
     if (exec_result.contains("file_names")) {
-        const std::string base_dir = config.getResultDirectory();
+        const std::string base_dir = config.result_directory;
 
         for (const auto& name : exec_result["file_names"]) {
             files.emplace_back(base_dir + "/" + name.get<std::string>());
@@ -104,14 +87,14 @@ void Agent::pollTasks()
     }
 
 	json result_payload = {
-        {"UID", config.getUID()},
-        {"access_code", config.getAccessCode()},
+        {"UID", config.uid},
+        {"access_code", config.access_code},
         {"message", exec_result.value("message", "")},
         {"files", files.size()},
         {"session_id", task.getSessionID()}
     };
 
-	spdlog::debug("Final result payload: {}", result_payload.dump(4));
+	spdlog::debug("Final result payload: {}", result_payload.dump());
 
 
 	json post_response = http.postMultipart(
@@ -121,35 +104,14 @@ void Agent::pollTasks()
         files
     );
 
-	spdlog::info("Server response: {}", post_response.dump(4));
+	spdlog::info("Server response: {}", post_response.dump());
 }
 
-void Agent::run()
-{
-    spdlog::info("Agent main loop started");
-
-    while(true)
-    {
-        try
-        {
-            pollTasks();
-        }
-        catch(const std::runtime_error& e)
-        {
-            spdlog::warn("Re-registering agent: {}", e.what());
-            registerAgent();
-        }
-        catch(const std::exception& e)
-        {
-            spdlog::error("Agent error: {}", e.what());
-        }
-
-        unsigned int interval = config.getPollInterval();
-
-        spdlog::debug("Sleeping for {} seconds", interval);
-
-        std::this_thread::sleep_for(
-            std::chrono::seconds(interval)
-        );
+void Agent::run() {
+    spdlog::info("Agent started");
+    while (true) {
+        spdlog::debug("New iteration of main loop");
+        processCycle();
+        std::this_thread::sleep_for(std::chrono::seconds(config.poll_interval_sec));
     }
 }

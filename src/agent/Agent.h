@@ -1,29 +1,18 @@
 #pragma once
+#include "config/Config.h"
+#include "http/HttpClient.h"
+#include "tasks/TaskExecutor.h"
 
-#include "../config/Config.h"
-#include "../http/HttpClient.h"
-#include "../tasks/TaskExecutor.h"
-
-using json = nlohmann::json;
-
-class Agent
-{
-private:
-
+class Agent {
     Config config;
     HttpClient http;
+    TaskExecutor executor;
 
 public:
-
-    Agent(const Config& cfg);
-
-    Config getConfig() const;
-
-    void updateConfig(Config cfg);
-
+    Agent(Config cfg);
     void registerAgent();
-
-    void pollTasks();
-
     void run();
+
+private:
+    void processCycle();
 };
