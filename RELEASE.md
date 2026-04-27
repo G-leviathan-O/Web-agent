@@ -6,22 +6,22 @@
 
 ---
 
-### 🐧 Linux
+# 🐧 Linux
 
-#### 📁 Структура релиза
+# 📁 Структура релиза
 
 ```text
 realeses/linux/
 ├── Web-agent
 └── config.json
-
+```
 ### 🪟 Windows
 #### 📁 Структура релиза
 ```text
 realeses/windows/
 ├── Web-agent.exe
 └── config.json
-
+```
 ▶️ Запуск
 
 Откройте PowerShell или командную строку:
