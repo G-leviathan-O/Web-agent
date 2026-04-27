@@ -6,43 +6,43 @@
 
 ---
 
-# 🐧 Linux
+## 🐧 Linux
 
-### 📁 Структура релиза
+#### 📁 Структура релиза
 
 ```text
 realeses/linux/
 ├── Web-agent
 └── config.json
 ```
-## ▶️ Запуск
+### ▶️ Запуск
 ```text
 cd realeses/linux
 chmod +x Web-agent
 ./Web-agent
 ```
-## ✅ Проверка работы
+### ✅ Проверка работы
 
 После запуска:
 
 создаётся файл логов (например agent.log);
 агент подключается к серверу;
 выполняются задачи (если они есть).
-# 🪟 Windows
-### 📁 Структура релиза
+## 🪟 Windows
+#### 📁 Структура релиза
 ```text
 realeses/windows/
 ├── Web-agent.exe
 └── config.json
 ```
-## ▶️ Запуск
+### ▶️ Запуск
 
 Откройте PowerShell или командную строку:
 ```text
 cd realeses\windows
 .\Web-agent.exe
 ```
-## ✅ Проверка работы
+### ✅ Проверка работы
 
 После запуска:
 
