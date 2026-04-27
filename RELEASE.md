@@ -16,9 +16,11 @@ realeses/linux/
 └── config.json
 ```
 ## ▶️ Запуск
+```text
 cd realeses/linux
 chmod +x Web-agent
 ./Web-agent
+```
 ## ✅ Проверка работы
 
 После запуска:
@@ -36,9 +38,10 @@ realeses/windows/
 ## ▶️ Запуск
 
 Откройте PowerShell или командную строку:
-
+```text
 cd realeses\windows
 .\Web-agent.exe
+```
 ## ✅ Проверка работы
 
 После запуска:
