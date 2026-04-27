@@ -1,4 +1,4 @@
-## 🚀 Running Release (Linux & Windows)
+# 🚀 Running Release (Linux & Windows)
 
 В этом разделе описано, как запустить готовый релиз Web-Agent на Linux и Windows.
 
