@@ -36,9 +36,3 @@ HTTP запросы через libcurl:
    - Отправляет результат
    - Спит poll_interval_sec секунд
    - Повторяет
-
-# Как добавить новое задание
-
-1. В Task.h добавить в enum class TaskType:
-```cpp
-MY_NEW_TYPE
