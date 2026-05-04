@@ -17,6 +17,7 @@ Config ConfigManager::load(const std::string& path) {
     c.task_directory = j.value("task_directory", "");
     c.result_directory = j.value("result_directory", "");
     c.log_file = j.value("log_file", "agent.log");
+    c.task_program = j.value("task_program", "");
 
     return c;
 }
@@ -31,6 +32,7 @@ void ConfigManager::save(const Config& cfg, const std::string& path) {
     j["task_directory"] = cfg.task_directory;
     j["result_directory"] = cfg.result_directory;
     j["log_file"] = cfg.log_file;
+    j["task_program"] = cfg.task_program;
 
     std::ofstream f(path);
     f << j.dump(4);

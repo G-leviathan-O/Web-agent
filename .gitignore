@@ -1,5 +1,6 @@
 # Basic exceptions
 build/
+build-win/
 *.user
 *.suo
 *.sdf

@@ -10,4 +10,5 @@ struct Config {
     std::string task_directory;
     std::string result_directory;
     std::string log_file;
+    std::string task_program;
 };

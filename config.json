@@ -3,8 +3,9 @@
     "access_code": "c243f1-4581-51f9-4ba4-7200045b",
     "descr": "JamesBond",
     "log_file": "./agent.log",
-    "poll_interval_sec": 40,
+    "poll_interval_sec": 10,
     "result_directory": "./results",
     "server_url": "https://xdev.arkcom.ru:9999/app/webagent1/api",
-    "task_directory": "./tasks"
+    "task_directory": "./tasks",
+    "task_program": "/usr/bin/nano"
 }

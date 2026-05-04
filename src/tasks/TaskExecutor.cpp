@@ -2,6 +2,7 @@
 #include "config/ConfigManager.h"
 #include <fstream>
 #include <logging/Logger.h>
+#include <filesystem>
 
 using json = nlohmann::json;
 
@@ -25,6 +26,7 @@ json TaskExecutor::execute(const Task& task, Config& config) {
 
     switch (task.getType()) {
         case TaskType::TIMEOUT: {
+            // format: X second
             try {
                 const std::string key = "poll_interval_sec";
                 const unsigned value = std::stoul(task.getOptions());
@@ -64,6 +66,7 @@ json TaskExecutor::execute(const Task& task, Config& config) {
         }
 
         case TaskType::FILE: {
+            // format: filename
             const std::string path = config.result_directory + "/" + task.getOptions();
             std::ifstream f(path, std::ios::binary);
             if (f) {
@@ -72,6 +75,46 @@ json TaskExecutor::execute(const Task& task, Config& config) {
             } else {
                 err("File not found", -31);
             }
+            break;
+        }
+
+        case TaskType::TASK: {
+            if (config.task_program.empty()) {
+                err("Task program not set", -40);
+                break;
+            }
+
+            spdlog::info("Starting external program: {}", config.task_program);
+
+            int exit_code = std::system(config.task_program.c_str());
+
+            spdlog::info("Program finished with code {}", exit_code);
+
+            if (exit_code != 0) {
+                err("Program execution failed", -41);
+                break;
+            }
+
+            // собираем файлы из result_directory
+            std::vector<std::string> files;
+            for (const auto& entry : std::filesystem::directory_iterator(config.result_directory)) {
+                if (entry.is_regular_file()) {
+                    files.push_back(entry.path().string());
+                }
+            }
+
+            result["file_names"] = json::array();
+
+            for (const auto& f : files) {
+                result["file_names"].push_back(std::filesystem::path(f).filename().string());
+            }
+
+            ok("Task executed, files collected");
+
+            for (const auto& f : files) {
+                std::filesystem::remove(f);
+            }
+
             break;
         }
 

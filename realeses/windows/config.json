@@ -6,5 +6,6 @@
     "poll_interval_sec": 40,
     "result_directory": "./results",
     "server_url": "https://xdev.arkcom.ru:9999/app/webagent1/api",
-    "task_directory": "./tasks"
+    "task_directory": "./tasks",
+    "task_program": "notepad.exe"
 }

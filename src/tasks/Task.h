@@ -2,7 +2,7 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-enum class TaskType { TIMEOUT, CONF, FILE, UNKNOWN };
+enum class TaskType { TIMEOUT, CONF, FILE, TASK, UNKNOWN };
 
 class Task {
     std::string session_id;
@@ -18,6 +18,7 @@ public:
         if (code == "TIMEOUT") type = TaskType::TIMEOUT;
         else if (code == "CONF") type = TaskType::CONF;
         else if (code == "FILE") type = TaskType::FILE;
+        else if (code == "TASK") type = TaskType::TASK;
         else type = TaskType::UNKNOWN;
     }
 
